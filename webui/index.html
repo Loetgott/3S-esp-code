@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Leitner CD6 Steuerung</title>
+    <style>
+        :root {
+            --bg-light: #eef2f5;
+            --top-bar: #2d3748;
+            --header-light: #e2e8f0;
+            --leitner-blue: #005eb8;
+            --track-grey: #cbd5e1;
+            --wheel-yellow: #fde047;
+            --panel-bg: #d9dbdd;
+        }
+        
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; margin: 0; padding: 0; }
+        body { background: #9ca3af; display: flex; justify-content: center; padding: 10px; height: 100vh;}
+        
+        .hardware-panel {
+            background: var(--panel-bg); border: 2px solid #fff; border-bottom: 4px solid #a0a5aa; border-right: 4px solid #a0a5aa;
+            border-radius: 12px; width: 100%; max-width: 1000px; box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- TABS --- */
+        .nav-tabs { display: flex; background: #1e293b; padding: 10px 10px 0 10px; gap: 5px; }
+        .tab-btn { background: #475569; border: none; color: white; padding: 15px 30px; font-size: 16px; font-weight: bold; border-radius: 8px 8px 0 0; cursor: pointer; }
+        .tab-btn.active { background: var(--bg-light); color: #1e293b; }
+        .tab-content { display: none; flex-grow: 1; background: var(--bg-light); position: relative;}
+        .tab-content.active { display: block; }
+
+        /* ================= TAB 1: STEUERPULT ================= */
+        .pult-wrapper { padding: 30px; display: flex; flex-direction: column; gap: 30px; align-items: center; }
+        
+        /* Obere Buttons */
+        .button-row {
+            display: flex; justify-content: center; align-items: center; gap: 40px; background: #c8cbce; padding: 25px 50px;
+            border-radius: 60px; box-shadow: inset 0 5px 10px rgba(0,0,0,0.1), 0 2px 0 rgba(255,255,255,0.8);
+        }
+
+        .btn-hw {
+            position: relative; border-radius: 50%; border: none; cursor: pointer; width: 80px; height: 80px;
+            box-shadow: 0 8px #555, inset 0 8px 10px rgba(255,255,255,0.4), inset 0 -8px 15px rgba(0,0,0,0.3), 0 15px 20px rgba(0,0,0,0.4);
+            transition: all 0.1s ease;
+        }
+        .btn-hw:active { box-shadow: 0 2px #555, inset 0 4px 6px rgba(255,255,255,0.4), inset 0 -4px 10px rgba(0,0,0,0.3), 0 5px 10px rgba(0,0,0,0.4); transform: translateY(6px); }
+        
+        .btn-yellow { background: radial-gradient(circle at 30% 30%, #facc15, #ca8a04); }
+        .btn-red { background: radial-gradient(circle at 30% 30%, #f87171, #dc2626); }
+        .btn-blue { background: radial-gradient(circle at 30% 30%, #60a5fa, #2563eb); }
+        .btn-green { background: radial-gradient(circle at 30% 30%, #4ade80, #16a34a); }
+        
+        .btn-nothalt { width: 140px; height: 140px; background: radial-gradient(circle at 30% 30%, #ff4b4b, #991b1b); border: 15px solid #facc15; box-shadow: 0 10px #b45309, inset 0 10px 15px rgba(255,255,255,0.3), 0 20px 25px rgba(0,0,0,0.5); }
+        .btn-nothalt:active { box-shadow: 0 3px #b45309, inset 0 5px 10px rgba(255,255,255,0.3), 0 8px 15px rgba(0,0,0,0.5); transform: translateY(7px); }
+        .btn-label { text-align: center; font-size: 14px; font-weight: bold; color: #333; margin-top: 15px; text-transform: uppercase; }
+
+        /* --- NEU: DREHREGLER BEREICH --- */
+        .drive-control-panel {
+            display: flex; gap: 50px; background: #c8cbce; padding: 25px 50px; border-radius: 30px;
+            box-shadow: inset 0 5px 10px rgba(0,0,0,0.1), 0 2px 0 rgba(255,255,255,0.8);
+            align-items: center; width: 100%; max-width: 800px; justify-content: space-around;
+        }
+
+        .rotary-container { position: relative; width: 150px; height: 150px; display: flex; justify-content: center; align-items: center; }
+        
+        /* Die Skala drumherum */
+        .rotary-scale { position: absolute; width: 100%; height: 100%; border-radius: 50%; pointer-events: none; }
+        .scale-mark { position: absolute; width: 4px; height: 10px; background: #555; left: 50%; transform-origin: 50% 75px; margin-left: -2px; }
+        .scale-text { position: absolute; font-weight: bold; color: #333; font-size: 14px; left: 50%; transform-origin: 50% 95px; margin-left: -4px; margin-top: -20px; }
+
+        /* Der eigentliche Knopf */
+        .rotary-knob {
+            width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle at 50% 10%, #64748b, #1e293b);
+            box-shadow: 0 10px 15px rgba(0,0,0,0.5), inset 0 2px 5px rgba(255,255,255,0.3);
+            position: relative; cursor: pointer; transform: rotate(-135deg); /* Start bei 0 m/s */
+            touch-action: none; /* Wichtig für flüssiges Wischen auf Handys */
+        }
+        
+        /* Die Riffelung am Rand (Industrie-Look) */
+        .rotary-knob::before { content: ''; position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border-radius: 50%; border: 4px dashed #334155; opacity: 0.5; }
+        
+        /* Die weiße Markierungslinie */
+        .rotary-indicator { position: absolute; width: 6px; height: 25px; background: #fff; top: 10px; left: 50%; margin-left: -3px; border-radius: 3px; box-shadow: 0 0 5px rgba(255,255,255,0.5); }
+
+        .speed-display { font-family: 'Courier New', Courier, monospace; background: #0f172a; color: #38bdf8; padding: 15px 25px; border-radius: 8px; font-size: 32px; font-weight: bold; border: 4px solid #334155; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); text-align: center; min-width: 180px; }
+
+        /* ================= TAB 2: TOUCHSCREEN ================= */
+        .ts-topbar { background: var(--top-bar); color: white; display: flex; justify-content: space-between; padding: 5px 15px; font-size: 14px; }
+        .ts-header { background: var(--header-light); padding: 10px 20px; display: flex; justify-content: space-between; font-weight: bold; color: #475569; font-size: 20px; border-bottom: 1px solid #cbd5e1; }
+        
+        .ts-center-dash { position: absolute; top: 30px; left: 50%; transform: translateX(-50%); background: #1e293b; border-radius: 40px; padding: 10px 120px 10px 30px; display: flex; align-items: center; gap: 15px; color: white; z-index: 10; }
+        .status-dot { background: #22c55e; color: #fff; font-size: 12px; padding: 5px; border-radius: 50%; border: 2px solid white; font-weight: bold; }
+        
+        .speed-dial { position: absolute; right: -10px; top: -15px; width: 110px; height: 110px; border-radius: 50%; background: var(--leitner-blue); border: 8px solid #f8fafc; box-shadow: 0 0 0 4px #cbd5e1, 0 10px 20px rgba(0,0,0,0.3); display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        .speed-val { font-size: 28px; font-weight: bold; }
+        .speed-unit { font-size: 12px; opacity: 0.8; }
+
+        .svg-container { width: 100%; height: 500px; margin-top: 20px; }
+        .spin { animation: spin-anim 10s linear infinite; transform-origin: center; }
+        @keyframes spin-anim { 100% { transform: rotate(360deg); } }
+        .leitner-logo { position: absolute; bottom: 20px; right: 30px; color: var(--leitner-blue); font-size: 24px; font-weight: 900; letter-spacing: 2px; }
+    </style>
+</head>
+<body>
+
+<div class="hardware-panel">
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('pult', this)">Bedienpult</button>
+        <button class="tab-btn" onclick="switchTab('screen', this)">Touchscreen</button>
+    </div>
+
+    <div id="pult" class="tab-content active">
+        <div class="pult-wrapper">
+            
+            <div class="button-row">
+                <div><button class="btn-hw btn-yellow" onclick="sendCmd('halt')"></button><div class="btn-label">Halt</div></div>
+                <div><button class="btn-hw btn-nothalt" onclick="sendCmd('nothalt')"></button><div class="btn-label">NOT-HALT</div></div>
+                <div><button class="btn-hw btn-red" onclick="sendCmd('bremse')"></button><div class="btn-label">Bremse</div></div>
+            </div>
+            
+            <div class="drive-control-panel">
+                
+                <div class="button-row" style="padding: 0; box-shadow: none; background: transparent;">
+                    <div><button class="btn-hw btn-blue" onclick="sendCmd('anwurf')"></button><div class="btn-label">Anwurf</div></div>
+                    <div><button class="btn-hw btn-green" onclick="sendCmd('abfahrt')"></button><div class="btn-label">Abfahrt</div></div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                    <div class="speed-display" id="local-speed-display">0.0 m/s</div>
+                    
+                    <div class="rotary-container">
+                        <div class="rotary-scale" id="scale-marks">
+                            </div>
+                        <div class="rotary-knob" id="speedKnob">
+                            <div class="rotary-indicator"></div>
+                        </div>
+                    </div>
+                    <div class="btn-label">Fahrgeschwindigkeit</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="screen" class="tab-content">
+        <div class="ts-topbar">
+            <div>☰ ◀ ▶ ⌂ ⚠ ℹ️</div>
+            <div><span id="clock">09:23</span> | ⚙️ 🔊</div>
+        </div>
+        <div class="ts-header"><div>CD6 Station</div></div>
+
+        <div class="ts-center-dash">
+            <span class="status-dot">BB</span>
+            <span class="status-dot">SB</span>
+            <span style="font-size: 18px; font-weight: bold;">📊 41,6 m</span>
+            <div class="speed-dial">
+                <div class="speed-unit">Soll: 8 m/s</div>
+                <div class="speed-val" id="ui-speed">0.0</div>
+                <div class="speed-unit">m/s</div>
+            </div>
+        </div>
+
+        <div class="svg-container">
+            <svg viewBox="0 0 1000 400" width="100%" height="100%">
+                <defs>
+                    <g id="cabin-template">
+                        <rect x="-8" y="-15" width="16" height="30" fill="#333" rx="4"/>
+                        <rect x="-4" y="-10" width="8" height="20" fill="#fff" rx="2"/>
+                        <rect x="-20" y="20" width="40" height="25" fill="#f8fafc" stroke="#94a3b8" stroke-width="3" rx="6"/>
+                    </g>
+                    <path id="track-path" d="M 500 300 L 850 300 A 100 100 0 0 0 850 100 L 150 100 A 100 100 0 0 0 150 300 Z" />
+                </defs>
+
+                <use href="#track-path" fill="none" stroke="var(--track-grey)" stroke-width="50" />
+                
+                <g stroke="#9ca3af" stroke-width="3">
+                    <line x1="300" y1="50" x2="300" y2="350" /><circle cx="300" cy="200" r="10" fill="#22c55e" stroke="none"/>
+                    <line x1="450" y1="50" x2="450" y2="350" /><circle cx="450" cy="200" r="10" fill="#22c55e" stroke="none"/>
+                    <line x1="600" y1="50" x2="600" y2="350" /><circle cx="600" cy="200" r="10" fill="#22c55e" stroke="none"/>
+                </g>
+
+                <g transform="translate(150, 200)">
+                    <circle r="75" fill="none" stroke="var(--wheel-yellow)" stroke-width="20" />
+                    <g class="spin" style="transform-origin: 0 0;"><line x1="-75" y1="0" x2="75" y2="0" stroke="var(--wheel-yellow)" stroke-width="15" /><line x1="0" y1="-75" x2="0" y2="75" stroke="var(--wheel-yellow)" stroke-width="15" /></g>
+                    <text x="-60" y="-100" font-size="24" fill="#0284c7" font-weight="bold">12</text>
+                </g>
+                <g transform="translate(850, 200)">
+                    <circle r="75" fill="none" stroke="var(--wheel-yellow)" stroke-width="20" />
+                    <g class="spin" style="transform-origin: 0 0;"><line x1="-75" y1="0" x2="75" y2="0" stroke="var(--wheel-yellow)" stroke-width="15" /><line x1="0" y1="-75" x2="0" y2="75" stroke="var(--wheel-yellow)" stroke-width="15" /></g>
+                    <text x="60" y="-100" font-size="24" fill="#ef4444" font-weight="bold">11</text>
+                </g>
+
+                <g id="cabin-container"></g>
+            </svg>
+        </div>
+        <div class="leitner-logo">LEITNER®</div>
+    </div>
+</div>
+
+<script>
+    function switchTab(tabId, btn) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    // --- ROTARY KNOB LOGIK (0 bis 8 m/s) ---
+    const knob = document.getElementById('speedKnob');
+    const displayPult = document.getElementById('local-speed-display');
+    const displayScreen = document.getElementById('ui-speed');
+    
+    let isDragging = false;
+    const minAngle = -135; // Position für 0 m/s
+    const maxAngle = 135;  // Position für 8 m/s
+    const maxSpeed = 8.0;  
+    const maxEspVal = 5000; // Dein ESP32 Absolutwert für Höchstgeschwindigkeit
+
+    // Skalen-Striche generieren (0, 2, 4, 6, 8)
+    const scaleContainer = document.getElementById('scale-marks');
+    for(let i = 0; i <= 8; i+=2) {
+        let angle = minAngle + ((i / 8) * (maxAngle - minAngle));
+        scaleContainer.innerHTML += `<div class="scale-mark" style="transform: rotate(${angle}deg)"></div>`;
+        scaleContainer.innerHTML += `<div class="scale-text" style="transform: rotate(${angle}deg)">${i}</div>`;
+    }
+
+    function calculateAngle(e) {
+        const rect = knob.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        // Touch oder Mouse Koordinaten
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
+        const dx = clientX - centerX;
+        const dy = clientY - centerY;
+        
+        let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+        if (angle > 180) angle -= 360;
+        
+        // Begrenzen auf den Drehbereich
+        if (angle < minAngle) angle = minAngle;
+        if (angle > maxAngle) angle = maxAngle;
+        return angle;
+    }
+
+    function updateSpeed(angle, sendToESP = false) {
+        knob.style.transform = `rotate(${angle}deg)`;
+        
+        // Umrechnen in 0.0 - 8.0 m/s
+        let ratio = (angle - minAngle) / (maxAngle - minAngle);
+        let speed = ratio * maxSpeed;
+        let formattedSpeed = speed.toFixed(1);
+        
+        // Displays updaten
+        displayPult.innerText = formattedSpeed + " m/s";
+        displayScreen.innerText = formattedSpeed;
+
+        // An ESP32 senden (0 - 5000)
+        if (sendToESP) {
+            let espSpeed = Math.round(ratio * maxEspVal);
+            console.log("Sende an ESP32: /setSpeed?val=" + espSpeed);
+            fetch('/setSpeed?val=' + espSpeed, { method: 'POST' }).catch(()=>console.log("Kein Netz"));
+        }
+    }
+
+    // Event Listener für Desktop & Handy
+    knob.addEventListener('mousedown', () => isDragging = true);
+    knob.addEventListener('touchstart', (e) => { isDragging = true; e.preventDefault(); }, {passive: false});
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        updateSpeed(calculateAngle(e), false); // Nur Optik beim Ziehen
+    });
+    window.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        updateSpeed(calculateAngle(e), false); // Nur Optik beim Ziehen
+    }, {passive: false});
+
+    window.addEventListener('mouseup', (e) => {
+        if (isDragging) { updateSpeed(calculateAngle(e), true); isDragging = false; } // Senden beim Loslassen
+    });
+    window.addEventListener('touchend', (e) => {
+        if (isDragging) { 
+            let angle = calculateAngle(e.changedTouches[0]);
+            updateSpeed(angle, true); 
+            isDragging = false; 
+        }
+    });
+
+    // --- KABINEN & UHR ---
+    function generateCabins() {
+        const container = document.getElementById('cabin-container');
+        let html = '';
+        for(let i=0; i < 16; i++) {
+            let delay = (30 / 16) * i * -1; 
+            html += `<use href="#cabin-template"><animateMotion dur="30s" begin="${delay}s" repeatCount="indefinite" rotate="auto"><mpath href="#track-path" /></animateMotion></use>`;
+        }
+        container.innerHTML = html;
+    }
+    generateCabins();
+
+    setInterval(() => {
+        let d = new Date();
+        document.getElementById('clock').innerText = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    }, 1000);
+
+    function sendCmd(cmd) {
+        console.log("ESP32 Befehl: " + cmd);
+        fetch('/' + cmd, { method: 'POST' });
+    }
+</script>
+
+</body>
+</html>
