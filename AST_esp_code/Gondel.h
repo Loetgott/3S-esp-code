@@ -5,7 +5,7 @@ class Gondola{
     int id;
     bool isStopped;
     Zone zone;
-    short progress
+    short progress;
 
   public:
 

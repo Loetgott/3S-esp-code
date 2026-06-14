@@ -1,0 +1,29 @@
+# Arduino/ESP build artifacts
+build/
+bin/
+*.hex
+*.elf
+*.o
+*.a
+*.map
+*.d
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*~
+*.bak
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Local configuration
+*.local.h
+.env
+secret.h
+
+# Personal experiments / Folders to exclude
+ersterStepperVersuch_TMC2208/
+Reichweitentest/
